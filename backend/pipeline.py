@@ -1,23 +1,3 @@
-"""
-Core forecasting pipeline, ported 1:1 from the Streamlit app's pages/*.py.
-
-Instead of st.session_state, pipeline state lives in the module-level STATE
-dict below. This mirrors Streamlit's session model but is process-global
-rather than per-browser-session -- fine for a single local dev instance
-(the same assumption the Streamlit app makes), not for multi-user production.
-
-NOTE ON KNOWN CAVEATS (kept intentionally, to match the graded Streamlit app):
-- run_cleaning() interpolates missing values on the FULL dataframe, before
-  run_prepare() does the chronological split. For this dataset, at the split
-  ratios exposed by the UI (0.60-0.95), none of the 6 missing values happen to
-  sit at a split boundary, so no leakage is actually triggered today -- but
-  the ordering is still fragile. See the lab review for details.
-- drop_duplicates(subset="date", keep="first") on 2006-06-01 arbitrarily
-  keeps one of three non-identical arrivals readings for that month.
-Both are carried over unchanged so this app's numbers match the Streamlit
-app's numbers exactly.
-"""
-
 import itertools
 from typing import Any
 
@@ -43,10 +23,6 @@ LOOKBACK = 12
 SEASONAL_PERIOD = 12
 PARAM_GRID = {"units": [32, 64], "dropout": [0.1, 0.3], "batch_size": [16, 32]}
 
-
-# ---------------------------------------------------------------------------
-# 1. Dataset
-# ---------------------------------------------------------------------------
 def load_dataset() -> dict:
     df = (
         pd.read_csv(DATA_PATH, parse_dates=["date"], skiprows=2)
@@ -71,10 +47,6 @@ def load_dataset() -> dict:
         "date_max": str(df["date"].max().date()),
     }
 
-
-# ---------------------------------------------------------------------------
-# 2. Clean
-# ---------------------------------------------------------------------------
 def run_cleaning() -> dict:
     if "raw_df" not in STATE:
         raise ValueError("Load the dataset first.")
@@ -112,10 +84,6 @@ def run_cleaning() -> dict:
     STATE["clean_report"] = report
     return report
 
-
-# ---------------------------------------------------------------------------
-# 3. Feature selection
-# ---------------------------------------------------------------------------
 def run_feature_selection() -> dict:
     if "clean_df" not in STATE:
         raise ValueError("Run cleaning first.")
@@ -147,10 +115,6 @@ def run_feature_selection() -> dict:
     STATE["feature_report"] = report
     return report
 
-
-# ---------------------------------------------------------------------------
-# 4. Prepare (leakage-safe split, scale, window)
-# ---------------------------------------------------------------------------
 def make_sequences(X, y, lookback):
     Xs, ys = [], []
     for i in range(len(X) - lookback):
@@ -205,10 +169,6 @@ def run_prepare(train_ratio: float = 0.80) -> dict:
     STATE["prepare_report"] = report
     return report
 
-
-# ---------------------------------------------------------------------------
-# 5. Train & tune
-# ---------------------------------------------------------------------------
 def run_train() -> dict:
     if "X_train_seq" not in STATE:
         raise ValueError("Run prepare first.")
@@ -256,10 +216,6 @@ def run_train() -> dict:
     STATE["train_report"] = report
     return report
 
-
-# ---------------------------------------------------------------------------
-# 6. Evaluate
-# ---------------------------------------------------------------------------
 def score(actual, pred) -> dict:
     mae = float(np.mean(np.abs(actual - pred)))
     rmse = float(np.sqrt(np.mean((actual - pred) ** 2)))
@@ -306,10 +262,6 @@ def run_evaluate() -> dict:
     STATE["evaluate_report"] = report
     return report
 
-
-# ---------------------------------------------------------------------------
-# 7. Explain (SHAP)
-# ---------------------------------------------------------------------------
 def run_explain() -> dict:
     if "model" not in STATE:
         raise ValueError("Run training first.")
@@ -355,10 +307,6 @@ def run_explain() -> dict:
     STATE["explain_report"] = report
     return report
 
-
-# ---------------------------------------------------------------------------
-# 8. Forecast
-# ---------------------------------------------------------------------------
 def get_forecast_default() -> dict:
     if "model" not in STATE:
         raise ValueError("Run training first.")
@@ -392,11 +340,6 @@ def run_forecast(window: list[list[float]]) -> dict:
     STATE["forecast_report"] = pred
     return {"predicted_arrivals": pred}
 
-
-# ---------------------------------------------------------------------------
-# Status (used by the frontend to gate navigation, like the Streamlit
-# "run the X page first" warnings)
-# ---------------------------------------------------------------------------
 def get_status() -> dict:
     return {
         "dataset": "raw_df" in STATE,
